@@ -514,9 +514,25 @@ export function sanitizeDecisionInput(value: string) {
     .slice(0, 600);
 }
 
-export function scenarioForInput(rawInput: string): DecisionScenario {
+function normalizeQuestion(value: string) {
+  return sanitizeDecisionInput(value)
+    .toLowerCase()
+    .replace(/[’]/g, "'")
+    .replace(/[^a-z0-9']+/g, " ")
+    .trim();
+}
+
+const connectedQuestionScenarios = new Map<string, DecisionScenario>([
+  [normalizeQuestion(exampleQuestions[0]), scenarios.armyMusic],
+  [normalizeQuestion(exampleQuestions[1]), scenarios.guitarSchool],
+  [normalizeQuestion(exampleQuestions[2]), scenarios.movingOut],
+  [normalizeQuestion(exampleQuestions[3]), scenarios.relationship],
+  [normalizeQuestion(exampleQuestions[4]), scenarios.homeSafety],
+  [normalizeQuestion(exampleQuestions[5]), scenarios.gangSafety],
+]);
+
+export function scenarioForInput(rawInput: string): DecisionScenario | null {
   const input = sanitizeDecisionInput(rawInput);
-  const lower = input.toLowerCase();
   const safetyKind = detectSafetyKind(input);
 
   if (safetyKind === "self-harm" || safetyKind === "harm-to-others") {
@@ -540,78 +556,6 @@ export function scenarioForInput(rawInput: string): DecisionScenario {
       prompt: input,
     };
   }
-  if (
-    (lower.includes("army") || lower.includes("military")) &&
-    (lower.includes("music") || lower.includes("musician"))
-  ) {
-    return scenarios.armyMusic;
-  }
-  if (
-    (lower.includes("guitar") || lower.includes("music")) &&
-    (lower.includes("school") || lower.includes("study"))
-  ) {
-    return scenarios.guitarSchool;
-  }
-  if (
-    (lower.includes("move out") || lower.includes("moving out") || lower.includes("leave home")) &&
-    !lower.includes("unsafe")
-  ) {
-    return scenarios.movingOut;
-  }
-  if (lower.includes("relationship") || lower.includes("dating")) {
-    return scenarios.relationship;
-  }
 
-  return {
-    id: "open-question",
-    prompt: input,
-    interpretation:
-      "There may be two questions living together here: what gives you relief or momentum now, and what kind of daily life each option may quietly build over time. Making the trade-offs concrete can create room to think.",
-    pathA: {
-      label: "Possible Path A",
-      title: "Move toward the change",
-      summary:
-        "This path may bring movement, new information and a stronger sense of agency. It may also introduce costs, commitments and consequences that are easy to overlook while the idea is still new.",
-      gives: "Momentum, learning, a different routine",
-      asks: "Preparation, uncertainty, accepting trade-offs",
-    },
-    pathB: {
-      label: "Possible Path B",
-      title: "Pause, prepare or reshape it",
-      summary:
-        "A pause can protect stability and create time for a smaller test. It can also become avoidance if there is no date, evidence or condition that would let the decision move.",
-      gives: "Time, stability, a lower-risk test",
-      asks: "A deadline, honest criteria, patience",
-    },
-    curve: [
-      {
-        label: "Now",
-        horizon: "The first move",
-        pathA: "Energy may rise as the decision becomes real; practical gaps also become visible.",
-        pathB: "Pressure may ease while you collect facts and define a smaller experiment.",
-      },
-      {
-        label: "Soon",
-        horizon: "The routine arrives",
-        pathA: "The choice starts to feel less like an idea and more like ordinary days.",
-        pathB: "Preparation may build confidence—or delay may begin to repeat itself.",
-      },
-      {
-        label: "Later",
-        horizon: "Compounding effects",
-        pathA: "Skills, relationships, money and identity may begin reinforcing the new path.",
-        pathB: "Options may stay open, while the cost of not choosing may become clearer.",
-      },
-      {
-        label: "Older You",
-        horizon: "The meaning you carry",
-        pathA: "You may value having tested the future directly, even if you later adjust it.",
-        pathB: "You may value protecting what mattered—or wish the test had begun sooner.",
-      },
-    ],
-    reflection:
-      "Which future feels more like the person you want to become, and which loss would be harder to live with?",
-    experiment:
-      "Design a two-week version that is safe, legal, low-cost and reversible. Decide in advance what you will observe about energy, stress, time, money and identity before reviewing what you learned.",
-  };
+  return connectedQuestionScenarios.get(normalizeQuestion(input)) ?? null;
 }

@@ -119,7 +119,9 @@ export function PhutureMeApp() {
   const [pendingScenario, setPendingScenario] = useState<DecisionScenario | null>(null);
   const [safetyState, setSafetyState] = useState<SafetyState>("idle");
   const [supportUrgent, setSupportUrgent] = useState(false);
+  const [unconnectedQuestion, setUnconnectedQuestion] = useState<string | null>(null);
   const resultRef = useRef<HTMLElement>(null);
+  const prototypeBoundaryRef = useRef<HTMLElement>(null);
   const questionLibraryRef = useRef<HTMLDetailsElement>(null);
 
   const activeSafetyKind = pendingScenario?.safetyKind ?? "general";
@@ -130,6 +132,7 @@ export function PhutureMeApp() {
     setPendingScenario(null);
     setSafetyState("idle");
     setSupportUrgent(false);
+    setUnconnectedQuestion(null);
     window.setTimeout(() => {
       resultRef.current?.focus();
       resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -143,6 +146,20 @@ export function PhutureMeApp() {
 
     setDecision(cleanDecision);
     const scenario = scenarioForInput(cleanDecision);
+    if (!scenario) {
+      setResult(null);
+      setPendingScenario(null);
+      setSafetyState("idle");
+      setSupportUrgent(false);
+      setUnconnectedQuestion(cleanDecision);
+      window.setTimeout(() => {
+        prototypeBoundaryRef.current?.focus();
+        prototypeBoundaryRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 40);
+      return;
+    }
+
+    setUnconnectedQuestion(null);
     if (scenario.requiresSafetyCheck) {
       setResult(null);
       setPendingScenario(scenario);
@@ -167,6 +184,7 @@ export function PhutureMeApp() {
     setPendingScenario(null);
     setSafetyState("idle");
     setSupportUrgent(false);
+    setUnconnectedQuestion(null);
     if (questionLibraryRef.current) questionLibraryRef.current.open = false;
     document.getElementById("decision")?.focus();
   };
@@ -198,6 +216,7 @@ export function PhutureMeApp() {
     setPendingScenario(null);
     setSafetyState("idle");
     setSupportUrgent(false);
+    setUnconnectedQuestion(null);
     window.setTimeout(() => document.getElementById("decision")?.focus(), 20);
   };
 
@@ -251,7 +270,10 @@ export function PhutureMeApp() {
                 rows={5}
               />
               <div className="form-footer">
-                <p>Nothing you write leaves this page or is stored.</p>
+                <div className="form-footer-copy">
+                  <p>Nothing you write leaves this page or is stored.</p>
+                  <p>Complete journeys are currently available for the six featured questions below.</p>
+                </div>
                 <button className="primary-button" type="submit" disabled={!decision.trim()}>
                   Explore my possible futures <span aria-hidden="true">→</span>
                 </button>
@@ -278,6 +300,10 @@ export function PhutureMeApp() {
                   <span>Explore more questions people carry</span>
                   <i aria-hidden="true">→</i>
                 </summary>
+                <p className="library-note">
+                  A glimpse of where Phuture Me is growing next. These questions are not
+                  connected to full journeys yet.
+                </p>
                 <div className="question-groups">
                   {questionGroups.map((group) => {
                     const groupId = `questions-${group.title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
@@ -285,19 +311,14 @@ export function PhutureMeApp() {
                     return (
                       <section key={group.title} aria-labelledby={groupId}>
                         <h3 id={groupId}>{group.title}</h3>
-                        <div>
+                        <ul>
                           {group.questions.map((question) => (
-                            <button
-                              type="button"
-                            className="library-question"
-                            key={question}
-                            onClick={() => chooseExample(question)}
-                          >
-                            <span aria-hidden="true">↗</span>
-                            {question}
-                          </button>
+                            <li className="library-question" key={question}>
+                              <span aria-hidden="true">•</span>
+                              {question}
+                            </li>
                           ))}
-                        </div>
+                        </ul>
                       </section>
                     );
                   })}
@@ -306,6 +327,40 @@ export function PhutureMeApp() {
             </div>
           </div>
         </section>
+
+        {unconnectedQuestion && (
+          <section
+            className="prototype-boundary-wrap section-wrap"
+            id="prototype-boundary"
+            ref={prototypeBoundaryRef}
+            tabIndex={-1}
+            aria-live="polite"
+            aria-labelledby="prototype-boundary-heading"
+          >
+            <div className="prototype-boundary-card">
+              <p className="step-label">HONEST PROTOTYPE BOUNDARY</p>
+              <h2 id="prototype-boundary-heading">
+                This question deserves a properly connected response.
+              </h2>
+              <blockquote>“{unconnectedQuestion}”</blockquote>
+              <p>
+                Phuture Me does not yet have a complete journey written for this
+                question. Rather than give you a generic answer that could feel
+                personal, this prototype stops here.
+              </p>
+              <div className="prototype-boundary-note">
+                <strong>What works today</strong>
+                <span>
+                  Choose one of the six featured questions above for a complete
+                  two-path exploration and Aging Curve.
+                </span>
+              </div>
+              <button type="button" className="text-button" onClick={reset}>
+                Choose a connected question
+              </button>
+            </div>
+          </section>
+        )}
 
         {safetyState === "checking" && (
           <section
