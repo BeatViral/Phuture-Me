@@ -8,7 +8,7 @@ The prototype never declares a winner or presents the future as certain. Questio
 
 ## What is included
 
-- Six fully connected prototype journeys with an honest boundary for unmatched questions
+- Six fully connected prototype journeys, curated confirmation for close wording, and an honest boundary for unmatched questions
 - Distinct Protection Before Exploration routes for self-harm, harm to others, unsafe homes and other danger
 - Six visible connected examples plus 31 non-interactive roadmap questions grouped by life area
 - Four-stage Aging Curve: Now, Soon, Later and Older You

@@ -4,10 +4,12 @@ import { FormEvent, useRef, useState } from "react";
 import {
   DecisionScenario,
   exampleQuestions,
+  JourneySuggestion,
   questionGroups,
   sanitizeDecisionInput,
   SafetyKind,
   scenarioForInput,
+  suggestedJourneyForInput,
 } from "./phuture-data";
 
 type SafetyState = "idle" | "checking" | "support";
@@ -119,8 +121,10 @@ export function PhutureMeApp() {
   const [pendingScenario, setPendingScenario] = useState<DecisionScenario | null>(null);
   const [safetyState, setSafetyState] = useState<SafetyState>("idle");
   const [supportUrgent, setSupportUrgent] = useState(false);
+  const [journeySuggestion, setJourneySuggestion] = useState<JourneySuggestion | null>(null);
   const [unconnectedQuestion, setUnconnectedQuestion] = useState<string | null>(null);
   const resultRef = useRef<HTMLElement>(null);
+  const journeySuggestionRef = useRef<HTMLElement>(null);
   const prototypeBoundaryRef = useRef<HTMLElement>(null);
   const questionLibraryRef = useRef<HTMLDetailsElement>(null);
 
@@ -132,6 +136,7 @@ export function PhutureMeApp() {
     setPendingScenario(null);
     setSafetyState("idle");
     setSupportUrgent(false);
+    setJourneySuggestion(null);
     setUnconnectedQuestion(null);
     window.setTimeout(() => {
       resultRef.current?.focus();
@@ -139,26 +144,21 @@ export function PhutureMeApp() {
     }, 40);
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const cleanDecision = sanitizeDecisionInput(decision);
-    if (!cleanDecision) return;
+  const showPrototypeBoundary = (question: string) => {
+    setResult(null);
+    setPendingScenario(null);
+    setSafetyState("idle");
+    setSupportUrgent(false);
+    setJourneySuggestion(null);
+    setUnconnectedQuestion(question);
+    window.setTimeout(() => {
+      prototypeBoundaryRef.current?.focus();
+      prototypeBoundaryRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 40);
+  };
 
-    setDecision(cleanDecision);
-    const scenario = scenarioForInput(cleanDecision);
-    if (!scenario) {
-      setResult(null);
-      setPendingScenario(null);
-      setSafetyState("idle");
-      setSupportUrgent(false);
-      setUnconnectedQuestion(cleanDecision);
-      window.setTimeout(() => {
-        prototypeBoundaryRef.current?.focus();
-        prototypeBoundaryRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 40);
-      return;
-    }
-
+  const beginScenario = (scenario: DecisionScenario) => {
+    setJourneySuggestion(null);
     setUnconnectedQuestion(null);
     if (scenario.requiresSafetyCheck) {
       setResult(null);
@@ -178,12 +178,43 @@ export function PhutureMeApp() {
     revealResult(scenario);
   };
 
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const cleanDecision = sanitizeDecisionInput(decision);
+    if (!cleanDecision) return;
+
+    setDecision(cleanDecision);
+    const scenario = scenarioForInput(cleanDecision);
+    if (!scenario) {
+      const suggestion = suggestedJourneyForInput(cleanDecision);
+      if (suggestion) {
+        setResult(null);
+        setPendingScenario(null);
+        setSafetyState("idle");
+        setSupportUrgent(false);
+        setUnconnectedQuestion(null);
+        setJourneySuggestion(suggestion);
+        window.setTimeout(() => {
+          journeySuggestionRef.current?.focus();
+          journeySuggestionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 40);
+        return;
+      }
+
+      showPrototypeBoundary(cleanDecision);
+      return;
+    }
+
+    beginScenario(scenario);
+  };
+
   const chooseExample = (question: string) => {
     setDecision(question);
     setResult(null);
     setPendingScenario(null);
     setSafetyState("idle");
     setSupportUrgent(false);
+    setJourneySuggestion(null);
     setUnconnectedQuestion(null);
     if (questionLibraryRef.current) questionLibraryRef.current.open = false;
     document.getElementById("decision")?.focus();
@@ -216,6 +247,7 @@ export function PhutureMeApp() {
     setPendingScenario(null);
     setSafetyState("idle");
     setSupportUrgent(false);
+    setJourneySuggestion(null);
     setUnconnectedQuestion(null);
     window.setTimeout(() => document.getElementById("decision")?.focus(), 20);
   };
@@ -327,6 +359,46 @@ export function PhutureMeApp() {
             </div>
           </div>
         </section>
+
+        {journeySuggestion && (
+          <section
+            className="journey-suggestion-wrap section-wrap"
+            id="journey-suggestion"
+            ref={journeySuggestionRef}
+            tabIndex={-1}
+            aria-live="polite"
+            aria-labelledby="journey-suggestion-heading"
+          >
+            <div className="journey-suggestion-card">
+              <p className="step-label">A NEARBY CONNECTED JOURNEY</p>
+              <h2 id="journey-suggestion-heading">
+                This sounds close to our <em>“{journeySuggestion.label}”</em> journey.
+              </h2>
+              <blockquote>“{decision}”</blockquote>
+              <p className="journey-suggestion-question">Would you like to explore that?</p>
+              <p className="journey-suggestion-boundary">
+                We will not assume it is the same question. You choose whether this
+                connected journey is a useful lens.
+              </p>
+              <div className="journey-suggestion-actions">
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => beginScenario(journeySuggestion.scenario)}
+                >
+                  Yes, explore this journey <span aria-hidden="true">→</span>
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button suggestion-decline"
+                  onClick={() => showPrototypeBoundary(decision)}
+                >
+                  No, this is different
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
 
         {unconnectedQuestion && (
           <section

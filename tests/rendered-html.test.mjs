@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
-import { exampleQuestions, scenarioForInput } from "../src/phuture-data.ts";
+import {
+  exampleQuestions,
+  scenarioForInput,
+  suggestedJourneyForInput,
+} from "../src/phuture-data.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -97,4 +101,32 @@ test("only featured questions receive complete prototype journeys", () => {
 
   assert.equal(scenarioForInput("Should I end this relationship?"), null);
   assert.equal(scenarioForInput("Should I take a job in another city?"), null);
+});
+
+test("curated near wording suggests a named journey without answering automatically", () => {
+  const movingOut = "Should I move out?";
+  assert.equal(scenarioForInput(movingOut), null);
+  assert.equal(suggestedJourneyForInput(movingOut)?.label, "Moving out of home");
+
+  assert.equal(
+    suggestedJourneyForInput("Should I enlist or give music a real chance?")?.label,
+    "Army or music",
+  );
+  assert.equal(
+    suggestedJourneyForInput("I hate school, but I still love learning.")?.label,
+    "School and learning",
+  );
+  assert.equal(
+    suggestedJourneyForInput("Should I start dating this person?")?.label,
+    "Starting a relationship",
+  );
+  assert.equal(
+    suggestedJourneyForInput("Should I speak to someone about my family?")?.label,
+    "Speaking up about home",
+  );
+
+  assert.equal(suggestedJourneyForInput(exampleQuestions[2]), null);
+  assert.equal(suggestedJourneyForInput("Should I move on from this grief?"), null);
+  assert.equal(suggestedJourneyForInput("Should I take a job in another city?"), null);
+  assert.equal(suggestedJourneyForInput("Should I hurt someone?"), null);
 });

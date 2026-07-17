@@ -32,6 +32,11 @@ export type DecisionScenario = {
   supportNote?: string;
 };
 
+export type JourneySuggestion = {
+  label: string;
+  scenario: DecisionScenario;
+};
+
 export const exampleQuestions = [
   "Should I join the army when I really want to be a musician?",
   "I love learning and playing guitar, but I hate school. What should I do?",
@@ -530,6 +535,64 @@ const connectedQuestionScenarios = new Map<string, DecisionScenario>([
   [normalizeQuestion(exampleQuestions[4]), scenarios.homeSafety],
   [normalizeQuestion(exampleQuestions[5]), scenarios.gangSafety],
 ]);
+
+const curatedJourneySuggestions: Array<{
+  label: string;
+  scenario: DecisionScenario;
+  matches: (input: string) => boolean;
+}> = [
+  {
+    label: "Army or music",
+    scenario: scenarios.armyMusic,
+    matches: (input) =>
+      /\b(army|military|defence force|defense force|enlist|soldier)\b/.test(input) &&
+      /\b(music|musician|guitar|artist|creative)\b/.test(input),
+  },
+  {
+    label: "School and learning",
+    scenario: scenarios.guitarSchool,
+    matches: (input) =>
+      /\bschool\b/.test(input) &&
+      /\b(hate|dislike|struggle|struggling|miserable|quit|leave|learning|guitar|music)\b/.test(input),
+  },
+  {
+    label: "Moving out of home",
+    scenario: scenarios.movingOut,
+    matches: (input) =>
+      /\b(move|moving) out\b/.test(input) ||
+      /\bleave (my )?(parents?|family)('?s)? home\b/.test(input) ||
+      /\blive (on my own|independently)\b/.test(input),
+  },
+  {
+    label: "Starting a relationship",
+    scenario: scenarios.relationship,
+    matches: (input) =>
+      /\b(start|begin|enter|try)\b.{0,28}\b(relationship|dating)\b/.test(input) ||
+      /\b(should i|do i) date\b/.test(input),
+  },
+  {
+    label: "Speaking up about home",
+    scenario: scenarios.homeSafety,
+    matches: (input) =>
+      /\b(tell|talk to|speak to|report)\b.{0,45}\b(home|family|parent|parents)\b/.test(input),
+  },
+  {
+    label: "Gang pressure and belonging",
+    scenario: scenarios.gangSafety,
+    matches: (input) => /\b(join|joining|pressure|pressuring)\b.{0,35}\b(gang)\b/.test(input),
+  },
+];
+
+export function suggestedJourneyForInput(rawInput: string): JourneySuggestion | null {
+  const input = sanitizeDecisionInput(rawInput);
+  if (!input || detectSafetyKind(input)) return null;
+
+  const normalizedInput = normalizeQuestion(input);
+  if (connectedQuestionScenarios.has(normalizedInput)) return null;
+
+  const suggestion = curatedJourneySuggestions.find(({ matches }) => matches(normalizedInput));
+  return suggestion ? { label: suggestion.label, scenario: suggestion.scenario } : null;
+}
 
 export function scenarioForInput(rawInput: string): DecisionScenario | null {
   const input = sanitizeDecisionInput(rawInput);
