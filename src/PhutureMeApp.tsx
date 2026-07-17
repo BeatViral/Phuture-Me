@@ -4,23 +4,132 @@ import { FormEvent, useRef, useState } from "react";
 import {
   DecisionScenario,
   exampleQuestions,
+  questionGroups,
   sanitizeDecisionInput,
+  SafetyKind,
   scenarioForInput,
 } from "./phuture-data";
 
 type SafetyState = "idle" | "checking" | "support";
+
+type SafetyPresentation = {
+  checkHeading: string;
+  checkBody: string;
+  safeLabel: string;
+  urgentLabel: string;
+  supportHeading: string;
+  urgentSupportHeading: string;
+  steps: { title: string; body: string }[];
+};
+
+const safetyPresentations: Record<SafetyKind, SafetyPresentation> = {
+  "self-harm": {
+    checkHeading: "Are you in immediate danger of hurting yourself?",
+    checkBody:
+      "If you might act on this now, pause here. Move away from anything you could use to hurt yourself and get another person with you.",
+    safeLabel: "I am not in immediate danger",
+    urgentLabel: "I might act on this now",
+    supportHeading: "Please bring another person into this now.",
+    urgentSupportHeading: "Stay with another person and contact urgent support now.",
+    steps: [
+      {
+        title: "Create immediate distance",
+        body: "Move away from anything you could use to hurt yourself and go where another person is present.",
+      },
+      {
+        title: "Say it plainly",
+        body: "Tell someone: ‘I am worried I might hurt myself. Please stay with me while we get help.’",
+      },
+      {
+        title: "Use crisis support",
+        body: "If you may act now, call emergency services. Otherwise contact a crisis line or qualified professional today.",
+      },
+    ],
+  },
+  "harm-to-others": {
+    checkHeading: "Could you act on this—or is someone in immediate danger?",
+    checkBody:
+      "Do not approach or confront the person. Create distance from them and anything you could use to cause harm, then involve someone who can help.",
+    safeLabel: "No one is in immediate danger",
+    urgentLabel: "Someone may be in danger",
+    supportHeading: "Pause the situation and involve someone before you act.",
+    urgentSupportHeading: "Create distance and get urgent human help now.",
+    steps: [
+      {
+        title: "Create distance",
+        body: "Do not meet, follow, message or confront the person. Move away from them and anything you could use to cause harm.",
+      },
+      {
+        title: "Tell someone now",
+        body: "Contact a trusted adult, qualified professional or calm person who can stay with you and help de-escalate.",
+      },
+      {
+        title: "Protect everyone",
+        body: "If anyone may be in immediate danger, contact emergency services and follow their instructions.",
+      },
+    ],
+  },
+  home: {
+    checkHeading: "Before we look ahead, are you safe right now?",
+    checkBody:
+      "Your question may involve danger at home. You do not have to explain everything or handle it alone.",
+    safeLabel: "Yes, I am safe right now",
+    urgentLabel: "No—or I am not sure",
+    supportHeading: "Please involve a person who can help now.",
+    urgentSupportHeading: "Please involve a person who can help now.",
+    steps: [
+      { title: "Move toward safety", body: "If you can, go to a safer place or stay near a trusted person." },
+      { title: "Contact someone", body: "Tell a trusted adult, trusted person or qualified professional now." },
+      { title: "Use urgent support", body: "If anyone is in immediate danger, contact your local emergency number." },
+    ],
+  },
+  gang: {
+    checkHeading: "Before we look ahead, are you safe from pressure or threats right now?",
+    checkBody:
+      "If anyone is pressuring, coercing or threatening you, you deserve backup and do not need to manage it alone.",
+    safeLabel: "Yes, I am safe right now",
+    urgentLabel: "No—or I am not sure",
+    supportHeading: "Please involve a person who can help now.",
+    urgentSupportHeading: "Create distance and get human help now.",
+    steps: [
+      { title: "Move toward safety", body: "Avoid meeting the group alone and stay near a trusted person if you can." },
+      { title: "Bring in backup", body: "Tell a trusted adult, youth worker or qualified professional what is happening." },
+      { title: "Use urgent support", body: "If anyone is in immediate danger, contact your local emergency number." },
+    ],
+  },
+  general: {
+    checkHeading: "Before we look ahead, is anyone in immediate danger?",
+    checkBody:
+      "Your question may involve danger, violence, threats, pressure or coercion. Protection comes before exploration.",
+    safeLabel: "No one is in immediate danger",
+    urgentLabel: "Someone may be in danger",
+    supportHeading: "Pause and involve someone who can help.",
+    urgentSupportHeading: "Move toward safety and get human help now.",
+    steps: [
+      { title: "Create distance", body: "Pause contact and move toward a safer place or trusted person." },
+      { title: "Contact someone", body: "Tell a trusted adult, trusted person or qualified professional what is happening." },
+      { title: "Use urgent support", body: "If anyone is in immediate danger, contact your local emergency number." },
+    ],
+  },
+};
 
 export function PhutureMeApp() {
   const [decision, setDecision] = useState("");
   const [result, setResult] = useState<DecisionScenario | null>(null);
   const [pendingScenario, setPendingScenario] = useState<DecisionScenario | null>(null);
   const [safetyState, setSafetyState] = useState<SafetyState>("idle");
+  const [supportUrgent, setSupportUrgent] = useState(false);
   const resultRef = useRef<HTMLElement>(null);
+  const questionLibraryRef = useRef<HTMLDetailsElement>(null);
+
+  const activeSafetyKind = pendingScenario?.safetyKind ?? "general";
+  const safetyPresentation = safetyPresentations[activeSafetyKind];
 
   const revealResult = (scenario: DecisionScenario) => {
     setResult(scenario);
     setPendingScenario(null);
     setSafetyState("idle");
+    setSupportUrgent(false);
     window.setTimeout(() => {
       resultRef.current?.focus();
       resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -38,6 +147,7 @@ export function PhutureMeApp() {
       setResult(null);
       setPendingScenario(scenario);
       setSafetyState("checking");
+      setSupportUrgent(false);
       window.setTimeout(() => {
         document.getElementById("safety-check")?.focus();
         document.getElementById("safety-check")?.scrollIntoView({
@@ -56,7 +166,30 @@ export function PhutureMeApp() {
     setResult(null);
     setPendingScenario(null);
     setSafetyState("idle");
+    setSupportUrgent(false);
+    if (questionLibraryRef.current) questionLibraryRef.current.open = false;
     document.getElementById("decision")?.focus();
+  };
+
+  const showSupport = (urgent: boolean) => {
+    setSupportUrgent(urgent);
+    setSafetyState("support");
+    window.setTimeout(() => {
+      document.getElementById("safety-check")?.focus();
+      document.getElementById("safety-check")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 40);
+  };
+
+  const confirmImmediateSafety = () => {
+    if (!pendingScenario) return;
+    if (pendingScenario.safetyOnly) {
+      showSupport(false);
+      return;
+    }
+    revealResult(pendingScenario);
   };
 
   const reset = () => {
@@ -64,6 +197,7 @@ export function PhutureMeApp() {
     setResult(null);
     setPendingScenario(null);
     setSafetyState("idle");
+    setSupportUrgent(false);
     window.setTimeout(() => document.getElementById("decision")?.focus(), 20);
   };
 
@@ -139,6 +273,36 @@ export function PhutureMeApp() {
                   </button>
                 ))}
               </div>
+              <details className="question-library" ref={questionLibraryRef}>
+                <summary>
+                  <span>Explore more questions people carry</span>
+                  <i aria-hidden="true">→</i>
+                </summary>
+                <div className="question-groups">
+                  {questionGroups.map((group) => {
+                    const groupId = `questions-${group.title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
+
+                    return (
+                      <section key={group.title} aria-labelledby={groupId}>
+                        <h3 id={groupId}>{group.title}</h3>
+                        <div>
+                          {group.questions.map((question) => (
+                            <button
+                              type="button"
+                            className="library-question"
+                            key={question}
+                            onClick={() => chooseExample(question)}
+                          >
+                            <span aria-hidden="true">↗</span>
+                            {question}
+                          </button>
+                          ))}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              </details>
             </div>
           </div>
         </section>
@@ -153,25 +317,22 @@ export function PhutureMeApp() {
           >
             <div className="safety-card">
               <p className="step-label">PROTECTION BEFORE EXPLORATION</p>
-              <h2 id="safety-heading">Before we look ahead, are you safe right now?</h2>
-              <p>
-                Your question may involve danger, harm, pressure or coercion. You do
-                not have to handle that alone.
-              </p>
+              <h2 id="safety-heading">{safetyPresentation.checkHeading}</h2>
+              <p>{safetyPresentation.checkBody}</p>
               <div className="safety-actions">
                 <button
                   type="button"
                   className="primary-button safety-yes"
-                  onClick={() => pendingScenario && revealResult(pendingScenario)}
+                  onClick={confirmImmediateSafety}
                 >
-                  Yes, I am safe right now.
+                  {safetyPresentation.safeLabel}
                 </button>
                 <button
                   type="button"
                   className="secondary-button"
-                  onClick={() => setSafetyState("support")}
+                  onClick={() => showSupport(true)}
                 >
-                  No—or I am not sure.
+                  {safetyPresentation.urgentLabel}
                 </button>
               </div>
             </div>
@@ -188,23 +349,19 @@ export function PhutureMeApp() {
           >
             <div className="safety-card support-card">
               <p className="step-label">YOUR SAFETY COMES FIRST</p>
-              <h2 id="support-heading">Please involve a person who can help now.</h2>
+              <h2 id="support-heading">
+                {supportUrgent
+                  ? safetyPresentation.urgentSupportHeading
+                  : safetyPresentation.supportHeading}
+              </h2>
               <div className="support-grid">
-                <div>
-                  <span>01</span>
-                  <h3>Move toward safety</h3>
-                  <p>If you can, go to a safer place or stay near a trusted person.</p>
-                </div>
-                <div>
-                  <span>02</span>
-                  <h3>Contact someone</h3>
-                  <p>Tell a trusted adult, trusted person or qualified professional now.</p>
-                </div>
-                <div>
-                  <span>03</span>
-                  <h3>Use urgent support</h3>
-                  <p>If anyone is in immediate danger, contact your local emergency number.</p>
-                </div>
+                {safetyPresentation.steps.map((step, index) => (
+                  <div key={step.title}>
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <h3>{step.title}</h3>
+                    <p>{step.body}</p>
+                  </div>
+                ))}
               </div>
               <div className="australia-support">
                 <p>If you are in Australia</p>
@@ -330,4 +487,3 @@ export function PhutureMeApp() {
     </div>
   );
 }
-

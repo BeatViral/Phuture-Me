@@ -1,3 +1,7 @@
+import { detectSafetyKind } from "./safety-routing.mjs";
+
+export type SafetyKind = "self-harm" | "harm-to-others" | "home" | "gang" | "general";
+
 export type CurveStage = {
   label: "Now" | "Soon" | "Later" | "Older You";
   horizon: string;
@@ -17,6 +21,8 @@ export type DecisionScenario = {
   id: string;
   prompt: string;
   requiresSafetyCheck?: boolean;
+  safetyKind?: SafetyKind;
+  safetyOnly?: boolean;
   interpretation: string;
   pathA: DecisionPath;
   pathB: DecisionPath;
@@ -33,6 +39,70 @@ export const exampleQuestions = [
   "Should I start this new relationship?",
   "Should I tell someone what is happening at home?",
   "Should I join this gang?",
+] as const;
+
+export const questionGroups = [
+  {
+    title: "Growing up",
+    questions: [
+      "I hate school but love learning. What should I do?",
+      "Should I leave school and start working?",
+      "Should I study what I love or what pays well?",
+      "My parents chose my future for me. Should I listen?",
+      "I am good at many things. How do I choose one?",
+    ],
+  },
+  {
+    title: "Friends, belonging and pressure",
+    questions: [
+      "Should I lie so my friends will accept me?",
+      "Should I try drugs because everyone else is?",
+      "Should I stay friends with people who make me feel small?",
+      "Should I dob on my sibling?",
+      "Should I tell someone what my friend is planning?",
+    ],
+  },
+  {
+    title: "Family and home",
+    questions: [
+      "Should I stop speaking to my mother?",
+      "Should I forgive a family member who hurt me?",
+      "Should I keep the peace or say what I really feel?",
+      "Am I selfish for wanting a different life from my family?",
+    ],
+  },
+  {
+    title: "Love and identity",
+    questions: [
+      "Should I stay with someone because they need me?",
+      "Should I tell people who I really am?",
+      "Should I change myself to keep this person?",
+      "Should I have children?",
+      "Should I marry someone my family does not accept?",
+    ],
+  },
+  {
+    title: "Work, money and direction",
+    questions: [
+      "Should I take this job or wait for something better?",
+      "Should I quit a secure job to build something of my own?",
+      "Should I choose money or time?",
+      "Should I move away for an opportunity?",
+      "Should I go into debt for university?",
+      "Should I keep chasing a dream that is not working yet?",
+    ],
+  },
+  {
+    title: "The quiet questions",
+    questions: [
+      "Should I apologise even if I still think I was right?",
+      "Should I tell the truth if it will hurt someone?",
+      "Should I give up on someone?",
+      "Should I ask for help?",
+      "Should I start again?",
+      "What if I make the wrong choice?",
+    ],
+  },
 ] as const;
 
 const scenarios: Record<string, DecisionScenario> = {
@@ -248,6 +318,7 @@ const scenarios: Record<string, DecisionScenario> = {
     id: "home-safety",
     prompt: exampleQuestions[4],
     requiresSafetyCheck: true,
+    safetyKind: "home",
     interpretation:
       "Part of you may want support while another part fears what could happen if you speak. You do not have to tell everyone or solve everything at once. The next question is who could help you make a safer telling plan.",
     pathA: {
@@ -303,6 +374,7 @@ const scenarios: Record<string, DecisionScenario> = {
     id: "gang-safety",
     prompt: exampleQuestions[5],
     requiresSafetyCheck: true,
+    safetyKind: "gang",
     interpretation:
       "This question can be about belonging, protection, pressure, fear or identity—not simply a lifestyle choice. The risk and consequences are real, so the useful comparison is between safer ways to find connection and support.",
     pathA: {
@@ -356,29 +428,83 @@ const scenarios: Record<string, DecisionScenario> = {
   },
 };
 
-const unsafeTerms = [
-  "suicide",
-  "kill myself",
-  "end my life",
-  "self harm",
-  "self-harm",
-  "hurt myself",
-  "abuse",
-  "abusive",
-  "violence",
-  "violent",
-  "threat",
-  "threatened",
-  "coercion",
-  "coerced",
-  "run away",
-  "running away",
-  "gang",
-  "crime",
-  "criminal",
-  "not safe",
-  "unsafe at home",
-];
+const generalSafetyScenario: DecisionScenario = {
+  ...scenarios.gangSafety,
+  id: "general-safety",
+  prompt: "A question involving danger or pressure",
+  safetyKind: "general",
+  interpretation:
+    "This may involve danger, threats, violence, pressure or coercion. The most useful next step is not to predict two futures, but to create distance from the risk and bring in another person who can help you assess what is happening.",
+  pathA: {
+    label: "Safer Path A",
+    title: "Pause and involve someone trustworthy",
+    summary:
+      "A trusted adult, professional, youth worker, manager or support service can help you understand the risk and make a safer plan without carrying it alone.",
+    gives: "Perspective, backup, more practical options",
+    asks: "Pausing, telling someone enough to help",
+  },
+  pathB: {
+    label: "Safer Path B",
+    title: "Use urgent support if the risk is immediate",
+    summary:
+      "If anyone may be in immediate danger, move toward a safer place and contact emergency services or another person who can act now.",
+    gives: "Immediate protection and human help",
+    asks: "Treating the danger seriously, acting now",
+  },
+  curve: [
+    {
+      label: "Now",
+      horizon: "Protection first",
+      pathA: "You pause the situation and tell one person who can help assess it.",
+      pathB: "Urgent support helps create distance from immediate danger.",
+    },
+    {
+      label: "Soon",
+      horizon: "A plan replaces isolation",
+      pathA: "You identify safer boundaries, places and people instead of improvising alone.",
+      pathB: "Professionals or trusted people help coordinate the next practical steps.",
+    },
+    {
+      label: "Later",
+      horizon: "Responsibility is shared",
+      pathA: "More support and information may widen the choices available to you.",
+      pathB: "Immediate intervention may protect people while a longer-term plan is built.",
+    },
+    {
+      label: "Older You",
+      horizon: "Safety mattered",
+      pathA: "You may value the moment you stopped treating danger as yours to solve alone.",
+      pathB: "You may remember that asking for urgent help was a protective action.",
+    },
+  ],
+  reflection:
+    "Who is the safest person available to involve before this situation moves any further?",
+  experiment:
+    "Do not run an experiment with danger. Pause contact, move toward a safer place and tell one trusted person or professional what is happening.",
+  supportNote:
+    "If anyone may be in immediate danger, stop here and contact emergency services or a trusted person who can act now.",
+};
+
+function safetyOnlyScenario(
+  input: string,
+  safetyKind: "self-harm" | "harm-to-others",
+): DecisionScenario {
+  const isSelfHarm = safetyKind === "self-harm";
+
+  return {
+    ...generalSafetyScenario,
+    id: isSelfHarm ? "self-harm-safety" : "harm-to-others-safety",
+    prompt: input,
+    safetyKind,
+    safetyOnly: true,
+    interpretation: isSelfHarm
+      ? "Thoughts of hurting yourself need human support, not a comparison of possible futures. Your immediate safety and connection to another person come first."
+      : "Thoughts of hurting another person need distance, de-escalation and human support, not a comparison of possible futures. Protecting everyone comes first.",
+    supportNote: isSelfHarm
+      ? "Phuture Me will not turn self-harm into two possible paths. Please involve another person or crisis support now."
+      : "Phuture Me will not turn harming someone into two possible paths. Create distance and involve another person or emergency support now.",
+  };
+}
 
 export function sanitizeDecisionInput(value: string) {
   return value
@@ -391,21 +517,27 @@ export function sanitizeDecisionInput(value: string) {
 export function scenarioForInput(rawInput: string): DecisionScenario {
   const input = sanitizeDecisionInput(rawInput);
   const lower = input.toLowerCase();
+  const safetyKind = detectSafetyKind(input);
 
-  if (lower.includes("gang")) return scenarios.gangSafety;
-  if (
-    (lower.includes("happening at home") || lower.includes("tell someone")) &&
-    (lower.includes("home") || lower.includes("abuse") || lower.includes("unsafe"))
-  ) {
-    return scenarios.homeSafety;
+  if (safetyKind === "self-harm" || safetyKind === "harm-to-others") {
+    return safetyOnlyScenario(input, safetyKind);
   }
-  if (unsafeTerms.some((term) => lower.includes(term))) {
+  if (safetyKind === "gang") {
+    return {
+      ...scenarios.gangSafety,
+      prompt: input,
+    };
+  }
+  if (safetyKind === "home") {
     return {
       ...scenarios.homeSafety,
-      id: "custom-safety",
       prompt: input,
-      interpretation:
-        "Your question may involve danger, harm, pressure or coercion. Protection comes before exploring possible futures, and you do not have to handle this alone.",
+    };
+  }
+  if (safetyKind === "general") {
+    return {
+      ...generalSafetyScenario,
+      prompt: input,
     };
   }
   if (
@@ -483,4 +615,3 @@ export function scenarioForInput(rawInput: string): DecisionScenario {
       "Design a two-week version that is safe, legal, low-cost and reversible. Decide in advance what you will observe about energy, stress, time, money and identity before reviewing what you learned.",
   };
 }
-

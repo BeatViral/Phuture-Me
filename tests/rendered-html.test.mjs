@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import { scenarioForInput } from "../src/phuture-data.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -24,6 +25,9 @@ test("server-renders the finished Phuture Me experience", async () => {
   assert.match(html, /Meet the life growing behind your/);
   assert.match(html, /What decision are you carrying/);
   assert.match(html, /Explore my possible futures/);
+  assert.match(html, /Explore more questions people carry/);
+  assert.match(html, /Friends, belonging and pressure/);
+  assert.match(html, /The quiet questions/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/);
 });
 
@@ -44,4 +48,41 @@ test("the branch-published fallback uses built browser assets", async () => {
   assert.ok(stylesheet, "index.html should load a production stylesheet");
   await access(new URL(`../${script[1]}`, import.meta.url));
   await access(new URL(`../${stylesheet[1]}`, import.meta.url));
+});
+
+test("dangerous prompts use the correct safety route", () => {
+  const harmToOthers = [
+    "Should I hurt someone?",
+    "Should I kill someone?",
+    "Should I attack him?",
+    "Should I beat him up?",
+    "I want to hurt my boss.",
+    "I might kill someone.",
+  ];
+
+  for (const prompt of harmToOthers) {
+    const scenario = scenarioForInput(prompt);
+    assert.equal(scenario.safetyKind, "harm-to-others", prompt);
+    assert.equal(scenario.safetyOnly, true, prompt);
+    assert.equal(scenario.requiresSafetyCheck, true, prompt);
+  }
+
+  for (const prompt of ["Should I hurt myself?", "I want to end my life.", "I feel suicidal."]) {
+    const scenario = scenarioForInput(prompt);
+    assert.equal(scenario.safetyKind, "self-harm", prompt);
+    assert.equal(scenario.safetyOnly, true, prompt);
+    assert.equal(scenario.requiresSafetyCheck, true, prompt);
+  }
+
+  assert.equal(
+    scenarioForInput("Should I tell someone what is happening at home?").safetyKind,
+    "home",
+  );
+  assert.equal(scenarioForInput("Someone is threatening me.").safetyKind, "general");
+});
+
+test("ordinary emotional language does not trigger violence routing", () => {
+  const scenario = scenarioForInput("Should I tell the truth if it will hurt someone?");
+  assert.equal(scenario.safetyKind, undefined);
+  assert.equal(scenario.id, "open-question");
 });

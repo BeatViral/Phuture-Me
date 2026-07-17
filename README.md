@@ -9,7 +9,8 @@ The prototype never declares a winner or presents the future as certain. Questio
 ## What is included
 
 - Six prewritten prototype scenarios plus a deterministic general response
-- Safety-aware Protection Before Exploration flow
+- Distinct Protection Before Exploration routes for self-harm, harm to others, unsafe homes and other danger
+- Six visible examples plus 31 more questions grouped by life area in an expandable collection
 - Four-stage Aging Curve: Now, Soon, Later and Older You
 - Responsive, keyboard-accessible interface with reduced-motion support
 - No backend, accounts, database, external AI, analytics or storage of user input
@@ -24,7 +25,7 @@ npm install
 npm run dev
 ```
 
-The local Sites-compatible app runs at `http://localhost:3000`.
+The local Vite app runs at `http://localhost:5173` with hot reload.
 
 ## Validation
 
