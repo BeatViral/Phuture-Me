@@ -38,11 +38,16 @@ The GitHub Pages build is written to `pages-dist/`. Its Vite base is explicitly 
 
 ## GitHub Pages
 
-The workflow at `.github/workflows/deploy.yml` builds and deploys the site whenever `main` is updated. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**.
+The workflow at `.github/workflows/deploy.yml` builds and deploys the site whenever `main` is updated. A production-built copy also lives at the repository root so the app remains usable if Pages is configured to publish directly from `main` instead of from the Actions artifact.
+
+Refresh that fallback after changing the app:
+
+```bash
+npm run sync:pages-fallback
+```
 
 ## Product boundary
 
 Concept prototype only. Phuture Me does not replace a trusted adult, qualified professional, emergency service or crisis support.
 
 Based on the concept Messy In → Beautiful Out™ by Mahmood Matloob.
-

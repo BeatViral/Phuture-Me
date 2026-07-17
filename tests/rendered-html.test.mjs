@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render(path = "/") {
@@ -33,3 +34,14 @@ test("unknown routes do not blank the application shell", async () => {
   assert.match(html, /Phuture Me|404/);
 });
 
+test("the branch-published fallback uses built browser assets", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const script = html.match(/src="\/Phuture-Me\/(assets\/[^"]+\.js)"/);
+  const stylesheet = html.match(/href="\/Phuture-Me\/(assets\/[^"]+\.css)"/);
+
+  assert.doesNotMatch(html, /src="\/src\/[^"']+\.(?:ts|tsx)"/);
+  assert.ok(script, "index.html should load a production JavaScript bundle");
+  assert.ok(stylesheet, "index.html should load a production stylesheet");
+  await access(new URL(`../${script[1]}`, import.meta.url));
+  await access(new URL(`../${stylesheet[1]}`, import.meta.url));
+});
